@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>DDL Detector</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      padding: 20px;
+    }
+    label {
+      display: block;
+      margin-top: 10px;
+    }
+    input, textarea, button {
+      margin-top: 5px;
+      padding: 8px;
+      width: 100%;
+      max-width: 500px;
+    }
+    #result {
+      margin-top: 20px;
+      padding: 10px;
+      border: 1px solid #ccc;
+      white-space: pre-wrap;
+      background: #f8f8f8;
+    }
+    table {
+      border-collapse: collapse;
+      margin-top: 10px;
+      width: 100%;
+      max-width: 600px;
+    }
+    th, td {
+      border: 1px solid #ccc;
+      padding: 8px;
+      text-align: center;
+    }
+    th {
+      background-color: #f0f0f0;
+    }
+    #evaluationResult p {
+      margin-top: 15px;
+      font-weight: bold;
+    }
+  </style>
+</head>
+<body>
+
+  <h1>DDL Detector Frontend</h1>
+
+  <form id="detectForm">
+    <label for="kalimat">Kalimat:</label>
+    <textarea id="kalimat" name="kalimat" rows="4" required></textarea>
+
+    <label for="file">File Database JSON:</label>
+    <input type="file" id="file" name="file" accept=".json" required>
+
+    <button type="submit">Deteksi DDL</button>
+  </form>
+
+  <div id="result"></div>
+
+  <hr>
+
+  <h2>Evaluasi Model</h2>
+  <button onclick="evaluateModel()">Evaluasi</button>
+
+  <div id="evaluationResult"></div>
+
+  <script>
+    const form = document.getElementById('detectForm');
+    const resultDiv = document.getElementById('result');
+    const evaluationDiv = document.getElementById('evaluationResult');
+
+    form.addEventListener('submit', async function(event) {
+      event.preventDefault();
+      
+      const formData = new FormData();
+      const kalimat = document.getElementById('kalimat').value;
+      const file = document.getElementById('file').files[0];
+
+      formData.append('kalimat', kalimat);
+      formData.append('file', file);
+
+      try {
+        const response = await fetch('http://localhost:5000/ddl/detect', {
+          method: 'POST',
+          body: formData
+        });
+
+        const data = await response.json();
+        resultDiv.innerText = JSON.stringify(data, null, 2);
+      } catch (error) {
+        resultDiv.innerText = 'Terjadi kesalahan: ' + error;
+      }
+    });
+
+    async function evaluateModel() {
+      evaluationDiv.innerHTML = "<p>Menjalankan evaluasi...</p>";
+      try {
+        const response = await fetch('http://localhost:5000/ddl/evaluate', {
+          method: 'POST'
+        });
+        const data = await response.json();
+        const metrics = data.metrics;
+        const accuracy = data.accuracy;
+
+        // Buat tabel HTML
+        let html = `
+          <table>
+            <thead>
+              <tr>
+                <th>Label</th>
+                <th>Precision</th>
+                <th>Recall</th>
+                <th>F1 Score</th>
+              </tr>
+            </thead>
+            <tbody>
+        `;
+
+        for (const label in metrics) {
+          const { precision, recall, f1 } = metrics[label];
+          html += `
+            <tr>
+              <td>${label}</td>
+              <td>${precision.toFixed(2)}</td>
+              <td>${recall.toFixed(2)}</td>
+              <td>${f1.toFixed(2)}</td>
+            </tr>
+          `;
+        }
+
+        html += `
+            </tbody>
+          </table>
+          <p>Accuracy: ${(accuracy * 100).toFixed(2)}%</p>
+        `;
+
+        evaluationDiv.innerHTML = html;
+
+      } catch (error) {
+        evaluationDiv.innerHTML = 'Terjadi kesalahan saat evaluasi: ' + error;
+      }
+    }
+  </script>
+</body>
+</html>
